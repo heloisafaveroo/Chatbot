@@ -1,0 +1,23 @@
+# Arquivos de ambiente (onde guardamos segredos como a API Key)
+.env
+
+# Diretório com os módulos do Node.js (gerado após rodar npm install)
+node_modules
+
+# Arquivos de log (podem conter informações sensíveis ou desnecessárias no repo)
+*.log
+logs/
+
+# Diretórios de build ou distribuição do seu frontend (se houver)
+dist/
+build/
+
+# Arquivos de cache de sistemas operacionais
+.DS_Store
+Thumbs.db
+
+# Outros arquivos temporários ou específicos do seu editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo

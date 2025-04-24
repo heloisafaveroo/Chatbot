@@ -1,21 +1,24 @@
 // server.js
+
+import dotenv from 'dotenv';
+dotenv.config();
 import express from 'express';
-import { GoogleGenerativeAI } from "@google/generative-ai"; // Corrected import name (usually GoogleGenerativeAI)
+import { GoogleGenerativeAI } from "@google/generative-ai"; 
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// --- Basic Setup ---
-const app = express();
-const port = 3000; // You can change the port if needed
 
-// --- ES Module __dirname workaround ---
+const app = express();
+const port = 3000; 
+
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// --- Gemini API Setup ---
-// !!! Substitua pela sua chave válida !!!
-const apiKey = "AIzaSyBDHRiDw5vPcLz0ZkFB9T5Q4MlErFMq_VU"; // Replace with your actual key
-if (!apiKey || apiKey === "YOUR_API_KEY_HERE" || apiKey.length < 30 ) { // Added a more robust check
+
+
+const apiKey = "AIzaSyBDHRiDw5vPcLz0ZkFB9T5Q4MlErFMq_VU"; 
+if (!apiKey || apiKey === "YOUR_API_KEY_HERE" || apiKey.length < 30 ) { 
     console.warn("\n\n*********************************************************************");
     console.warn("*** ATENÇÃO: Configure sua chave de API válida do Gemini em server.js! ***");
     console.warn("O servidor funcionará, mas as chamadas para a IA falharão.");
@@ -24,7 +27,7 @@ if (!apiKey || apiKey === "YOUR_API_KEY_HERE" || apiKey.length < 30 ) { // Added
 }
 
 // Initialize the GoogleGenerativeAI client with the API key
-const genAI = new GoogleGenerativeAI(apiKey);
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // Get the generative model instance - UPDATED LINE
 const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" }); // Changed model name here
