@@ -1,73 +1,104 @@
 // client.js
 document.addEventListener('DOMContentLoaded', () => {
-    // Get references to the HTML elements
     const messageInput = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
     const chatHistory = document.getElementById('chat-history');
 
-    // --- Event Listeners ---
-    // Send message when the button is clicked
     sendButton.addEventListener('click', sendMessage);
-
-    // Send message when Enter key is pressed in the input field
     messageInput.addEventListener('keypress', (event) => {
         if (event.key === 'Enter') {
             sendMessage();
-            event.preventDefault(); // Prevent default Enter behavior (like adding a newline)
+            event.preventDefault();
         }
     });
 
-    // --- Core Function to Send Message ---
     async function sendMessage() {
-        const messageText = messageInput.value.trim(); // Get text and remove extra whitespace
+        const messageText = messageInput.value.trim();
+        if (!messageText) return;
 
-        if (!messageText) return; // Don't send empty messages
-
-        // 1. Display user's message immediately
         appendMessage('user', messageText);
-
-        // 2. Clear the input field
         messageInput.value = '';
-        messageInput.focus(); // Keep focus on input
+        messageInput.focus();
 
-        // 3. Send message to the backend and handle the response
         try {
             const response = await fetch('/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ message: messageText }), // Send as JSON
+                body: JSON.stringify({ message: messageText }),
             });
 
             if (!response.ok) {
-                // If response status is not 2xx, handle as error
-                const errorData = await response.json(); // Try to get error details from backend
+                const errorData = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
                 throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
             }
 
-            const data = await response.json(); // Parse successful JSON response
+            const data = await response.json();
 
-            // 4. Display bot's response
-            appendMessage('bot', data.response);
+            // Display bot's textual response
+            if (data.response) {
+                appendMessage('bot', data.response);
+            }
+
+            // If weather data is present, display the weather card
+            if (data.weatherData && data.weatherData.type === "weather") {
+                appendWeatherCard(data.weatherData, chatHistory);
+            }
 
         } catch (error) {
             console.error('Erro ao enviar/receber mensagem:', error);
-            // 5. Display error message in chat
             appendMessage('error', `Ops! Algo deu errado: ${error.message}`);
         }
     }
 
-    // --- Helper Function to Add Messages to Chat History ---
     function appendMessage(sender, text) {
         const messageDiv = document.createElement('div');
-        messageDiv.classList.add('message'); // Common class for all messages
-        messageDiv.classList.add(`${sender}-message`); // Specific class (user-message, bot-message, error-message)
-        messageDiv.textContent = text; // Set the text content safely
-
+        messageDiv.classList.add('message', `${sender}-message`);
+        // To render newlines if Gemini sends them (it might for formatted text)
+        messageDiv.innerHTML = text.replace(/\n/g, '<br>');
         chatHistory.appendChild(messageDiv);
-
-        // Auto-scroll to the bottom
         chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+
+    // --- New Function to Add Weather Card ---
+    function appendWeatherCard(weatherData, container) {
+        const card = document.createElement('div');
+        card.classList.add('message', 'bot-message', 'weather-card-message'); // Use bot-message for alignment
+
+        const content = document.createElement('div');
+        content.classList.add('weather-card-content');
+
+        const title = document.createElement('h3');
+        title.textContent = `Clima em ${weatherData.locationName}, ${weatherData.country}`;
+        content.appendChild(title);
+
+        if (weatherData.icon) {
+            const iconImg = document.createElement('img');
+            iconImg.src = `https://openweathermap.org/img/wn/${weatherData.icon}@2x.png`;
+            iconImg.alt = weatherData.description;
+            iconImg.classList.add('weather-icon');
+            content.appendChild(iconImg);
+        }
+
+        const tempP = document.createElement('p');
+        tempP.textContent = `Temperatura: ${weatherData.temperature?.toFixed(1)}°C`;
+        content.appendChild(tempP);
+
+        const descP = document.createElement('p');
+        descP.textContent = `Condição: ${weatherData.description}`;
+        content.appendChild(descP);
+
+        const humidityP = document.createElement('p');
+        humidityP.textContent = `Umidade: ${weatherData.humidity}%`;
+        content.appendChild(humidityP);
+
+        const windP = document.createElement('p');
+        windP.textContent = `Vento: ${weatherData.windSpeed} m/s`;
+        content.appendChild(windP);
+
+        card.appendChild(content);
+        container.appendChild(card);
+        container.scrollTop = container.scrollHeight; // Scroll to show the new card
     }
 });

@@ -111,3 +111,36 @@ h1 {
 #send-button:active {
     background-color: #030f1b;
 }
+
+.weather-card-message {
+    background-color: #e0f2fe; /* Light blue, distinct from regular bot messages */
+    border: 1px solid #bae6fd;
+    max-width: 90%; /* Can be wider than normal messages */
+    align-self: flex-start; /* Align like bot messages */
+}
+
+.weather-card-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+    color: #075985; /* Darker blue text for contrast */
+}
+
+.weather-card-content h3 {
+    font-size: 1.1rem;
+    margin-bottom: 10px;
+    color: #0c4a6e;
+}
+
+.weather-card-content .weather-icon {
+    width: 60px; /* Slightly larger icon */
+    height: 60px;
+    margin-bottom: 8px;
+}
+
+.weather-card-content p {
+    font-size: 0.95rem;
+    margin: 3px 0;
+    line-height: 1.3;
+}
