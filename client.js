@@ -1,4 +1,5 @@
-// client.js
+const RENDER_BACKEND_URL = 'https://vovo-chatbot-backend.onrender.com'; 
+
 document.addEventListener('DOMContentLoaded', () => {
     const messageInput = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
@@ -21,7 +22,8 @@ document.addEventListener('DOMContentLoaded', () => {
         messageInput.focus();
 
         try {
-            const response = await fetch('/chat', {
+            // MODIFICADO AQUI para usar RENDER_BACKEND_URL
+            const response = await fetch(`${RENDER_BACKEND_URL}/chat`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
