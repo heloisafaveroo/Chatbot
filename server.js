@@ -5,9 +5,12 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import path from 'path';
 import { fileURLToPath } from 'url';
 import axios from 'axios';
+import cors from 'cors';
+
+
 
 const app = express();
-const port = process.env.PORT || 3000; // MODIFICADO AQUI
+const port = 3000;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,7 +28,7 @@ if (!openWeatherMapApiKey || openWeatherMapApiKey === "SUA_CHAVE_DO_OPENWEATHERM
 
 const genAI = new GoogleGenerativeAI(apiKey);
 const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash",
+    model: "gemini-2.0-flash",
     tools: [
         {
             functionDeclarations: [
@@ -89,7 +92,12 @@ const model = genAI.getGenerativeModel({
 
 // Middlewares
 app.use(express.json());
-app.use(express.static(__dirname)); // Serve arquivos estáticos da raiz (index.html, client.js, style.css)
+app.use(express.static(__dirname));
+
+app.use(cors());
+
+//app.use(cors('origin:*'));
+
 
 // Funções auxiliares
 async function getCurrentTime({ timezone = "America/Sao_Paulo" } = {}) {
@@ -220,27 +228,22 @@ app.post('/chat', async (req, res) => {
 
         console.log("Recebido do usuário:", userMessage);
 
+
+        const mydata= getCurrentTime();
+
         const chat = model.startChat({
             history: [
-                // O histórico inicial pode ser ajustado para melhor definir o comportamento do bot
-                // Por exemplo, pode incluir uma instrução de sistema mais elaborada.
                 {
                     role: "user",
-                    parts: [{ text: "Olá!" }],
+                    parts: [{ text: "data e hora de agora:" + mydata
+                        
+                     }],
                 },
-                {
+                {   
                     role: "model",
-                    parts: [{ text: "Olá! Sou o Vovô Chat. Como posso te ajudar hoje, meu jovem?" }],
+                    parts: [{ text: "Olá! Sou o Jarvis, seu assistente pessoal. Estou pronto para conversar sobre o que você quiser. O que lhe interessa hoje?" }],
                 },
-                 // Exemplo de como o Gemini aprende a usar a função getCurrentTime:
-                // { role: "user", parts: [{ text: "Que horas são em Curitiba?"}]},
-                // { role: "model", parts: [{ functionCall: { name: "getCurrentTime", args: { timezone: "America/Sao_Paulo"}}}]},
-                // { role: "user", parts: [{ functionResponse: { name: "getCurrentTime", response: { datetime: "...", timezone: "America/Sao_Paulo", date: "...", time: "...", formatted: "..."}}}]},
-                // { role: "model", parts: [{ text: "Em America/Sao_Paulo: Data: ..., Hora: ..."}]}
             ],
-            // Adicionei a configuration generation e safetySettings aqui também para consistência
-            generationConfig: model.generationConfig,
-            safetySettings: model.safetySettings,
         });
 
         const result = await chat.sendMessage(userMessage);
@@ -263,12 +266,15 @@ app.post('/chat', async (req, res) => {
             let functionResultPayload;
             switch (functionName) {
                 case "getCurrentTime":
+                    // Se Gemini não passar timezone, a função getCurrentTime usará o default.
+                    // Para "que horas em Curitiba", esperamos que Gemini passe { timezone: "America/Sao_Paulo" }
+                    // Para "que dia é hoje", esperamos que Gemini chame sem args ou com { timezone: "America/Sao_Paulo" }
                     functionResultPayload = await getCurrentTime(functionArgs);
                     break;
                 case "getCurrentWeather":
                     functionResultPayload = await getCurrentWeather(functionArgs);
                     if (functionResultPayload && functionResultPayload.type === "weather" && !functionResultPayload.error) {
-                        structuredFunctionResult = functionResultPayload; // Passa para o frontend
+                        structuredFunctionResult = functionResultPayload;
                     }
                     break;
                 case "getHistoricalFact":
@@ -281,34 +287,34 @@ app.post('/chat', async (req, res) => {
                     functionResultPayload = { error: "Função não implementada.", formatted: "Desculpe, essa função não está implementada." };
             }
 
-            // Enviar a resposta da função de volta para o modelo
             const resultWithFunctionResponse = await chat.sendMessage([
                 {
                     functionResponse: {
                         name: functionName,
-                        response: functionResultPayload // O payload já contém o campo 'formatted' para o Gemini usar
+                        response: functionResultPayload
                     }
                 },
             ]);
             const finalResponse = await resultWithFunctionResponse.response;
             botResponseText = finalResponse.text();
 
-            // Se a função retornou um erro, e o Gemini não o usou, podemos adicionar explicitamente.
-            // O ideal é que o Gemini aprenda a usar o .formatted ou .error da resposta da função.
-            if (functionResultPayload.error && botResponseText && !botResponseText.toLowerCase().includes(functionResultPayload.error.toLowerCase().substring(0,20))) {
+            // As instruções no prompt devem fazer o Gemini usar o erro da função.
+            // Se functionResultPayload.error existir e o Gemini não o mencionou adequadamente,
+            // a resposta do Gemini pode ser menos útil. O prompt foi reforçado para isso.
+            if (functionResultPayload.error && botResponseText && !botResponseText.toLowerCase().includes(functionResultPayload.error.toLowerCase().slice(0, 30))) {
                 console.warn("Gemini pode não ter usado completamente a mensagem de erro da função. Resposta do Gemini:", botResponseText, "Erro da função:", functionResultPayload.formatted);
-                // botResponseText = functionResultPayload.formatted; // Ou uma combinação.
+                // Poderíamos forçar, mas idealmente o prompt resolve:
+                // botResponseText = functionResultPayload.formatted; // Ou uma combinação
             }
+
 
         } else if (response.text) {
             botResponseText = response.text();
         } else {
-            // Resposta padrão se o modelo não fornecer texto nem chamada de função
-            botResponseText = "Não entendi muito bem. Você poderia reformular sua pergunta ou me dar mais detalhes?";
+            botResponseText = "Entendo. Para te ajudar melhor, poderia reformular sua pergunta ou me dar mais contexto sobre o que você gostaria de conversar?";
         }
 
         console.log("Enviando para o usuário:", botResponseText);
-        // Enviar a resposta final para o cliente, incluindo dados estruturados se houver (ex: clima)
         res.json({ response: botResponseText, weatherData: structuredFunctionResult });
 
     } catch (error) {
@@ -320,19 +326,15 @@ app.post('/chat', async (req, res) => {
             errorMessage = 'Chave de API do Gemini inválida. Verifique sua configuração no arquivo .env';
             statusCode = 401;
         } else if (error.response && error.response.data && error.response.data.error) {
-            // Para erros da API Gemini
             errorMessage = `Erro da API Gemini: ${error.response.data.error.message || 'Erro desconhecido'}`;
             statusCode = error.response.status || 500;
         }
-        // Adicione outras verificações de erro específicas aqui, se necessário
-
         res.status(statusCode).json({ error: errorMessage });
     }
 });
 
-
 app.listen(port, () => {
-    console.log(`\n🤖 Servidor rodando na porta ${port}`); // MODIFICADO AQUI
+    console.log(`\n🤖 Servidor rodando em http://localhost:${port}`);
     console.log(`🔑 Gemini API Key: ${apiKey && apiKey !== "YOUR_API_KEY_HERE" && apiKey.length >= 30 ? 'Configurada' : 'NÃO CONFIGURADA OU INVÁLIDA'}`);
     console.log(`🌦️ Weather API Key: ${openWeatherMapApiKey && openWeatherMapApiKey !== "SUA_CHAVE_DO_OPENWEATHERMAP" && openWeatherMapApiKey.length >= 20 ? 'Configurada' : 'NÃO CONFIGURADA OU INVÁLIDA'}`);
     if (!apiKey || apiKey === "YOUR_API_KEY_HERE" || apiKey.length < 30) {
